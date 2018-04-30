@@ -17,9 +17,7 @@ namespace Host_File_Modifier
         {
             Uri uri = new Uri(hreflink);
 
-            string filename = System.IO.Path.GetFileName(uri.LocalPath);
-
-            return filename;
+            return Path.GetFileName(uri.LocalPath);
         }
 
         static async Task<IReadOnlyList<RepositoryContent>> returnURL(string filename)
@@ -40,85 +38,195 @@ namespace Host_File_Modifier
             return file;
         }
 
+        static List<string> mergeLists(List<string> list1, List<string> list2)
+        {
+            List<string> merged = new List<string>();
+
+            bool match = false;
+            foreach (string host in list1)
+            {
+                var host_split = host.Split(' ');
+                for (int i = 1; i < host_split.Length; i++)
+                {
+                    foreach (string x in list2)
+                    {
+                        var x_split = x.Split(' ');
+                        for (int j = 1; j < x_split.Length; j++)
+                        {
+                            match = host_split[i] == x_split[j];
+                            if (match)
+                                break;
+                        }
+                        if (match)
+                            break;
+                    }
+                    if (match)
+                        break;
+                }
+
+                if (!match)
+                {
+                    merged.Add(host);
+                    //Console.WriteLine(host);
+                }
+
+                match = false;
+            }
+
+            foreach (string host in list2)
+            {
+                var host_split = host.Split(' ');
+                for (int i = 1; i < host_split.Length; i++)
+                {
+                    foreach (string x in list1)
+                    {
+                        var x_split = x.Split(' ');
+                        for (int j = 1; j < x_split.Length; j++)
+                        {
+                            match = host_split[i] == x_split[j];
+                            if (match)
+                                break;
+                        }
+                        if (match)
+                            break;
+                    }
+                    if (match)
+                        break;
+                }
+
+                if (!match)
+                {
+                    merged.Add(host);
+                    //Console.WriteLine(host);
+                }
+
+                match = false;
+            }
+
+            return merged;
+        }
+
+        static List<string> removeDuplicateFromLists(List<string> list1, List<string> list2)
+        {
+            List<string> removed = new List<string>();
+
+            bool match = false;
+            foreach (string host in list1)
+            {
+                var host_split = host.Split(' ');
+                for (int i = 1; i < host_split.Length; i++)
+                {
+                    foreach (string x in list2)
+                    {
+                        var x_split = x.Split(' ');
+                        for (int j = 1; j < x_split.Length; j++)
+                        {
+                            match = host_split[i] == x_split[j];
+                            if (match)
+                                break;
+                        }
+                        if (match)
+                            break;
+                    }
+                    if (match)
+                        break;
+                }
+
+                if (!match)
+                {
+                    removed.Add(host);
+                    //Console.WriteLine(host);
+                }
+
+                match = false;
+            }
+            return removed;
+        }
+
+        static List<string> cleanupHosts (List<string> list)
+        {
+            return null;
+        }
+
         static void Main(string[] args)
         {
-            List<string> hosts_debug = debug_returnlistfromfiles("hosts_debug1");
-
-            Task<IReadOnlyList<RepositoryContent>> fileContent = returnURL("hosts");
-            Console.WriteLine("Please Wait.");
-            fileContent.Wait();
-            var x = fileContent.Result;
-            if (x != null)
-                foreach (RepositoryContent content in x)
-                {
-                    Console.WriteLine(content.DownloadUrl);
-                }
-
-            using (WebClient downloader = new WebClient())
+            if (!File.Exists("hosts"))
             {
-                downloader.DownloadFile(x[0].DownloadUrl, returnFilename(x[0].DownloadUrl));
+                Task<IReadOnlyList<RepositoryContent>> fileContent = returnURL("hosts");
+                Console.WriteLine("Please Wait.");
+                fileContent.Wait();
+                var x = fileContent.Result;
+                if (x != null)
+                    foreach (RepositoryContent content in x)
+                    {
+                        Console.WriteLine(content.DownloadUrl);
+                    }
+
+                using (WebClient downloader = new WebClient())
+                {
+                    downloader.DownloadFile(x[0].DownloadUrl, returnFilename(x[0].DownloadUrl));
+                }
             }
+            else
+                Console.WriteLine("Hosts file already downloaded.");
 
-            Console.WriteLine("Done downloading hosts file from gvoze32/unblockhostid repository. Reading file...");
-
+            string hostsFileLocation = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + @"\System32\drivers\etc\hosts";
+            //List<string> originalHosts = debug_returnorigfiles(hostsFileLocation);
+            List<string> originalHosts = debug_returnorigfiles("hosts_debug1");
             List<string> downloadedHosts = debug_returnlistfromfiles("hosts");
-
-            List<string> mergedHosts = hosts_debug.Union(downloadedHosts).ToList();
-
-
-            Console.WriteLine("Done merging any changes.");
-
-            foreach (string line in mergedHosts)
-                Console.WriteLine(line);
-
-            Console.ReadKey();
-            #region  
-
-            string fileLocation = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + @"\System32\drivers\etc\hosts";
-
-            List<string> originalHosts = debug_returnorigfiles(fileLocation);
+            List<string> mergedHosts = mergeLists(originalHosts, downloadedHosts);
 
             bool getHost = false;
-
             int readPosition = 0 - 1;
             int startEditing = 0, endEditing = 0;
-            foreach (string host in originalHosts)
-            {
-                readPosition++;
-                if (host == "#[HOST_EDIT_START]")
+            if (originalHosts.Contains("#[HOST_EDIT_START]"))
+            { 
+                foreach (string host in originalHosts)
                 {
-                    getHost = true;
-                    startEditing = readPosition+1;
-                    continue;
-                }
-                if (host == "#[HOST_EDIT_END]")
-                {
-                    endEditing = readPosition-1;
-                    getHost = false;
-                    continue;
+                    readPosition++;
+                    if (host == "#[HOST_EDIT_START]")
+                    {
+                        getHost = true;
+                        startEditing = readPosition + 1;
+                        continue;
+                    }
+                    if (host == "#[HOST_EDIT_END]")
+                    {
+                        endEditing = readPosition - 1;
+                        getHost = false;
+                        continue;
+                    }
+
+                    if (getHost)
+                    {
+                        //Console.WriteLine(host);
+                    }
                 }
 
-                if (getHost)
+                originalHosts.RemoveRange(startEditing, endEditing - startEditing + 1);
+
+                originalHosts.InsertRange(startEditing, downloadedHosts)  ;
+            }
+            else
+            {
+                originalHosts.Add("#[HOST_EDIT_START]");
+                originalHosts.AddRange(downloadedHosts);
+                originalHosts.Add("#[HOST_EDIT_END]");
+            }
+
+
+            foreach (string lines in originalHosts)
+                Console.WriteLine(lines);
+
+            using (StreamWriter write = new StreamWriter("hosts_debug1", false, Encoding.UTF8, 1024))
+            {
+                foreach (string line in originalHosts)
                 {
-                    Console.WriteLine(host);
+                    write.WriteLine(line);
                 }
             }
 
-            originalHosts.RemoveRange(startEditing, endEditing - startEditing + 1);
-
-            foreach (string host in originalHosts)
-                Console.WriteLine(host);
-
-            Console.ReadKey();
-
-            originalHosts.InsertRange(startEditing, mergedHosts.Except(originalHosts));
-
-            foreach (string host in originalHosts)
-                Console.WriteLine(host);
-             
-
-            Console.ReadKey();
-#endregion
+                Console.ReadKey();
         }
 
         static string debug_readandprintstuff(string filename)
