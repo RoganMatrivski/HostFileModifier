@@ -27,10 +27,12 @@ namespace Host_File_Modifier
 {
     class Program
     {
+        [STAThread]
         static void Main(string[] arguments)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainUI());
+            Application.Run(new EditHostsUI());
         }
+    }
 }
